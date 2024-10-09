@@ -12,7 +12,7 @@ class Tiles(Enum):
     SPOOKY_HOLLOW = "S"
     EXIT = "E"
 
-
+# test
 class TreasureConfig(IntEnum):
     MAX_NUMBER_OF_TREASURES = 20
     MIN_NUMBER_OF_TREASURES = 10
