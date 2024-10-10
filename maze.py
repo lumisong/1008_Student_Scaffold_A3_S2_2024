@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -120,8 +121,11 @@ class Maze:
 
             Assuming dictionary operations can be done on O(1) time.
         """
+        maze_name = maze_name.lstrip('/\\')  # Remove leading slashes
+        maze_dir = os.path.join(os.path.dirname(__file__), 'mazes')
+        maze_path = os.path.join(maze_dir, maze_name)
         tile_count: dict[str, int] = {}
-        with open(f"./mazes/{maze_name}", 'r') as f:
+        with open(maze_path, 'r') as f:
             lines: List[str] = f.readlines()
             cols: int = len(lines[0].strip())
             for line in lines:
@@ -163,11 +167,20 @@ class Maze:
 
             For small mazes we assume the lists we not need to resize.
         """
+        maze_name = maze_name.lstrip('/\\')  # Remove leading slashes
+        maze_dir = os.path.join(os.path.dirname(__file__), 'mazes')
+        maze_path = os.path.join(maze_dir, maze_name)
         cls.validate_maze_file(maze_name)
+
+        # **Reset the MysticalHollow treasures before loading the maze**
+
+        MysticalHollow.treasures = []
+        MysticalHollow.treasure_map = None
+
         end_positions, walls, hollows = [], [], []
         mystical_hollow: MysticalHollow = MysticalHollow()
         start_position: Position | None = None
-        with open(f"./mazes/{maze_name}", 'r') as f:
+        with open(maze_path, 'r') as f:
             lines: List[str] = f.readlines()
             rows: int = len(lines)
             cols: int = len(lines[0].strip())
@@ -197,55 +210,128 @@ class Maze:
             bool - True if the position is within the maze and not blocked by a wall.
 
         Complexity:
-            Best Case Complexity: TODO
-            Worst Case Complexity: TODO
+            Best Case Complexity: O(1)
+            Worst Case Complexity: O(1)
         """
-        raise NotImplementedError
+        if 0 <= position.row < self.rows and 0 <= position.col < self.cols:
+            tile = self.grid[position.row][position.col].tile
+            if tile != Tiles.WALL.value:
+                return True
+        return False
 
     def get_available_positions(self, current_position: Position) -> List[Position]:
         """
-        Returns a list of all the new possible you can move to from your current position.
+        Returns a list of all the new possible positions you can move to from your current position.
 
         Args:
             current_position (Position): Your current position.
 
         Returns:
-            List[Position] - A list of all the new possible you can move to from your current position.
+            List[Position] - A list of all the new possible positions you can move to from your current position.
 
         Complexity:
-            Best Case Complexity: TODO
-            Worst Case Complexity: TODO
+            Best Case Complexity: O(1)
+            Worst Case Complexity: O(1)
         """
-
-        raise NotImplementedError
+        available_positions = []
+        for direction in Directions:
+            delta_row, delta_col = self.directions[direction]
+            new_row = current_position.row + delta_row
+            new_col = current_position.col + delta_col
+            new_position = Position(new_row, new_col)
+            if self.is_valid_position(new_position):
+                available_positions.append(new_position)
+        return available_positions
 
     def find_way_out(self) -> List[Position] | None:
         """
-        Finds a way out of the maze in some cases there may be multiple exits
+        Finds a way out of the maze. In some cases there may be multiple exits
         or no exits at all.
 
         Returns:
-            List[Position]: If there is a way out of the maze, 
-            the path will be made up of the coordinates starting at 
+            List[Position]: If there is a way out of the maze,
+            the path will be made up of the coordinates starting at
             your original starting point and ending at the exit.
 
             None: Unable to find a path to the exit, simply return None.
 
         Complexity:
-            Best Case Complexity: TODO
-            Worst Case Complexity: TODO
+            Best Case Complexity: O(N)
+            Worst Case Complexity: O(N)
+            Where N is the number of cells in the maze.
         """
-        start: Position = self.start_position
-        raise NotImplementedError
+        path = []
+        self.reset_visited()
+        if self._dfs(self.start_position, path):
+            return path
+        else:
+            return None
+
+    def _dfs(self, position: Position, path: List[Position]) -> bool:
+        """
+        Helper method for find_way_out using recursive depth-first search.
+
+        Args:
+            position (Position): Current position in the maze.
+            path (List[Position]): The current path taken.
+
+        Returns:
+            bool: True if an exit has been found, False otherwise.
+
+        Complexity:
+            Best Case Complexity: O(N)
+            Worst Case Complexity: O(N)
+            Where N is the number of cells in the maze.
+        """
+        # Base cases
+        if position in self.end_positions:
+            path.append(position)
+            return True
+
+        cell = self.grid[position.row][position.col]
+        if cell.visited:
+            return False
+
+        # Mark the cell as visited
+        cell.visited = True
+        path.append(position)
+
+        # Movement priorities: up, down, left, right
+        for direction in [Directions.UP, Directions.DOWN, Directions.LEFT, Directions.RIGHT]:
+            delta_row, delta_col = self.directions[direction]
+            new_row = position.row + delta_row
+            new_col = position.col + delta_col
+            new_position = Position(new_row, new_col)
+            if self.is_valid_position(new_position):
+                next_cell = self.grid[new_row][new_col]
+                if not next_cell.visited:
+                    if self._dfs(new_position, path):
+                        return True
+
+        # Backtrack
+        path.pop()
+        return False
+
+    def reset_visited(self) -> None:
+        """
+        Resets the visited status of all cells in the maze.
+
+        Complexity:
+            Best Case Complexity: O(N)
+            Worst Case Complexity: O(N)
+            Where N is the number of cells in the maze.
+        """
+        for row in self.grid:
+            for cell in row:
+                cell.visited = False
 
     def take_treasures(self, path: List[MazeCell], backpack_capacity: int) -> List[Treasure] | None:
         """
         You must take the treasures in the order they appear in the path selecting treasures
-        that have the highest value / weight ratio.
-        Remember the total of treasures cannot exceed backpack_capacity, which means
-        Individual treasures cannot exceed this value either.
+        that have the highest value / weight ratio. Remember the total of treasures cannot
+        exceed backpack_capacity, which means individual treasures cannot exceed this value either.
 
-        Should there be no treasures that are viable please return an empty list.
+        Should there be no treasures that are viable please return None.
 
         You do not have to validate the path, it is guaranteed to be a valid path.
 
@@ -258,11 +344,23 @@ class Maze:
             None - If there are no treasures to take.
 
         Complexity:
-            Best Case Complexity: TODO
-            Worst Case Complexity: TODO
-
+            Best Case Complexity: O(M)
+            Worst Case Complexity: O(M * log N)
+            Where M is the length of the path and N is the number of treasures in a hollow.
         """
-        raise NotImplementedError
+        treasures_taken = []
+        remaining_capacity = backpack_capacity
+        for cell in path:
+            tile = cell.tile
+            if isinstance(tile, Hollow):
+                treasure = tile.get_optimal_treasure(remaining_capacity)
+                if treasure is not None:
+                    treasures_taken.append(treasure)
+                    remaining_capacity -= treasure.weight
+        if len(treasures_taken) == 0:
+            return None
+        else:
+            return treasures_taken
 
     def __repr__(self) -> str:
         return str(self)
@@ -272,13 +370,13 @@ class Maze:
         Returns the grid in a human-readable format.
 
         Complexity:
-        Best Case Complexity: O(n) where n is the number of cells in the maze.
-        Worst Case Complexity: O(n) where n is the number of cells in the maze.
+        Best Case Complexity: O(N) where N is the number of cells in the maze.
+        Worst Case Complexity: O(N) where N is the number of cells in the maze.
         """
         my_grid: str = ""
         for row in self.grid:
             my_grid += "" if my_grid == "" else "\n"
-            my_grid += str(row)
+            my_grid += ''.join(str(cell) for cell in row)
 
         return my_grid
 
