@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import List, Tuple, TypeVar
+import math
 
 
 from data_structures.bst import BinarySearchTree
